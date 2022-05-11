@@ -1,8 +1,12 @@
 from setuptools import setup,find_packages,Extension
 
-VERSION = '0.6'
+def long_description():
+  with open('README.md',encoding='utf-8') as f:
+    desc=f.read()
+  return desc
+VERSION = '0.7'
 DESCRIPTION = 'Automação do processo de classificação de solicitações de compra de Notebooks à faculdade -Trabalho Acadêmico Hipotético'
-LONG_DESCRIPTION = 'Biblioteca que integra as análises iniciais e gráficos feitos sobre o conjunto de dados fornecidos para reconhecimento da natureza destes, com a implementação dos critérios de aprovação escolhidos, ferramentas para a classificação de novos estudantes e criação do perfil do estudante baseado na média ponderada das notas normalizadas atribuídas com possibilidade de pesquisa de novos pesos através de teste por força bruta implementado em API externa.'
+LONG_DESCRIPTION = long_description()
 
 # Setting up
 setup(
@@ -14,7 +18,7 @@ setup(
     long_description_content_type="text/markdown",
     long_description=LONG_DESCRIPTION,
     packages=find_packages(),
-    install_requires=['numpy','pandas','plotly','matplotlib','bs4','requests'],
+    install_requires=['numpy','pandas','plotly','matplotlib','bs4','requests','sklearn'],
     keywords=['python','pucsp','cdia'],
     classifiers=[
         "Programming Language :: Python :: 3"
