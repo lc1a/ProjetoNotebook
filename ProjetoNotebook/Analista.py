@@ -10,7 +10,7 @@ import math
 import random
 import matplotlib as mpl
 from time import sleep
-from numpy import array,dot,nan,zeros,append,where,multiply
+from numpy import array,dot,nan,zeros,append,where,multiply,linspace,isclose,sort,flipud
 from os import system,name
 import requests
 import concurrent.futures
@@ -18,6 +18,8 @@ from bs4 import BeautifulSoup as bs
 import datetime as dt
 import numpy as np
 import matplotlib.patheffects
+import seaborn
+from sklearn.cluster import KMeans
 #Tornando Dados Acessíveis no ambiente
 def load_TABESTUDANTES():
   stream_te = pkg_resources.resource_stream(__name__, 'Dados/estudantes-pucsp.tsv')
@@ -38,7 +40,7 @@ def load_Legendas():
   SPC={1:"Masculino",2:"Feminino"}
   EPC={1:"Pública",2:"Privada"}
   return CURPCOD,CPC,SPC,EPC
-  
+
 TABESTUDANTES=load_TABESTUDANTES()
 COLUNASP=load_COLUNASP()
 NOTAS=load_NOTAS()
@@ -54,13 +56,13 @@ CURPCOD,CPC,SPS,EPC=load_Legendas()
 
 class AgrupamentoCondicional():
   def SMWeb(self,ano=dt.datetime.today().year,mes=dt.datetime.today().month):
-    
-    '''Retorna o valor, em tipo float, do Salário Mínimo Nominal vigente no ano e mês fornecidos a partir da 
-  acquisição e formatação dos dados fornecidos pela página html 
+
+    '''Retorna o valor, em tipo float, do Salário Mínimo Nominal vigente no ano e mês fornecidos a partir da
+  acquisição e formatação dos dados fornecidos pela página html
   hospedada no endereço:'https://www.dieese.org.br/analisecestabasica/salarioMinimo.html
   Caso não sejam fornecidos ano e mês utiliza a biblioteca datetime para adquirir o ano e mes locais da
   máquina de execução do código.'''
-  
+
     mint2mstr={1:'Janeiro',2:'Fevereiro',3:'Março',4:'Abril',5:'Maio',6:'Junho',7:'Julho',8:'Agosto',9:'Setembro',10:'Outubro',
              11:'Novembro',12:'Dezembro'}
     link='https://www.dieese.org.br/analisecestabasica/salarioMinimo.html#2021'
@@ -102,29 +104,29 @@ class AgrupamentoCondicional():
           return float(ano_mes_dict[ano].iloc[0][0].replace('R$','').replace('.','').replace(',','.').strip())
     else:
       return f'Ano {ano} Não Encontrado No Site Buscado.'
-  
+
   def __init__(self,SM=0):
-    
+
     '''Cria uma Instância/Objeto da Classe AgrupamentoCondicional a partir de um dicionário
     {'ano': Ano Entre 1995 e Atual,'mes': Mes do Ano fornecido} opcional fornecido para a busca
     do Salário Mínimo Vigente No momento da execução para realizar a classificação
     de classe social do IBGE utilizando a Renda Familiar Mensal.'''
-    
+
     self.SM=SM
     #Executando a Busca do SM
     if SM==0:
       AgrupamentoCondicional.SMWeb(self)
     else:
       AgrupamentoCondicional.SMWeb(self,**self.SM)
-    
+
   def group_renda(self,r):
-    
-    """Retorna uma string pertencente ao conjunto [A,B,C,D,E] que representa a classe social na 
+
+    """Retorna uma string pertencente ao conjunto [A,B,C,D,E] que representa a classe social na
     qual o estudante está incluido de acordo com sua renda familiar mensal medida em múltiplos
     do salário mínimo. Métrica utilizada pelo IBGE.
     Argumentos/Parâmetros:
     r=Renda Familiar mensal"""
-    
+
     salario_min=self.SmEncontrado
     if r<=salario_min*2:
       return "E"
@@ -136,9 +138,9 @@ class AgrupamentoCondicional():
       return "B"
     else:
       return "A"
-    
+
   def group_idade(self,i):
-    
+
     """Retorna uma string pertencente ao conjunto [J,A1,A2,I],
     que representa em qual faixa etária o estudante se encontra de acordo com sua idade.
     Definições:
@@ -148,7 +150,7 @@ class AgrupamentoCondicional():
     I=Idoso(Mais que 60 anos).
     Argumentos/Parâmetros:
     i= Idade"""
-    
+
     if i<=19:
       return "J"
     elif i<=30:
@@ -157,9 +159,9 @@ class AgrupamentoCondicional():
       return "A2"
     else:
       return "I"
-    
+
   def group_motiv(self,m):
-    
+
     """Retorna uma string pertencente ao conjunto [NM,PM,M,MM] que representa em qual grupo,
        m questão da motivação em permanecer no curso, o estudante se encontra.
        Definições:
@@ -169,7 +171,7 @@ class AgrupamentoCondicional():
        MM= Muito Motivado (10)
        Argumentos/Parâmetros:
        m=Motivação"""
-    
+
     if m<=3:
       return "NM"
     elif m<=6:
@@ -178,7 +180,7 @@ class AgrupamentoCondicional():
       return "M"
     else:
       return "MM"
-    
+
 #Definindo a Classe ModificarDados
 
 #Utilizada para armazenar funções que realizam operações sobre os dados originais e retornam análises pertinentes em formato pronto para a criação de gráficos
@@ -188,25 +190,25 @@ class AgrupamentoCondicional():
 #Ao ser chamada inicializa uma Instância da Classe AgrupamentoCondicional, Logo aceita o mesmo parâmetro opcional desta e realiza   #as operações que envolvem a classificação dos estudantes em classes sociais utilizando o valor do salário mínimo obtido através da  #função SMWeb
 
 class ModificarDados():
-  
+
   def __init__(self,SM=0):
     '''Inicializador da Classe ModificarDados que aceita o mesmo parâmetro Opcional da Classe AgrupamentoCondiciona
     Pois Inicializa uma Instância desta.'''
-    
+
     self.inst_AC=AgrupamentoCondicional(SM)
-    
+
   def criar_subcjtdict(self,tabela,colunas,legendas=None,n=1):
-    """Retorna dicionário(s) de tabela(s) de subconjunto(s) de todos os itens da tabela original, que apresentam o mesmo valor em uma determinada coluna, 
+    """Retorna dicionário(s) de tabela(s) de subconjunto(s) de todos os itens da tabela original, que apresentam o mesmo valor em uma determinada coluna,
     para todos os valores presentes nesta coluna.
     Argumentos/Parâmetros:
     tabela=tabela original (já existente) do Pandas;
     colunas= Nome da coluna da tabela original (ou lista destes nomes) sobre a qual se deseja criar os subconjuntos;
-    legendas=Dicionário que tem como chaves os códigos presentes na coluna da tabela original e como valores as legendas destes códigos que serão as chaves 
+    legendas=Dicionário que tem como chaves os códigos presentes na coluna da tabela original e como valores as legendas destes códigos que serão as chaves
     do dicionário criado.Seu valor padrão é None
     e quando não fornecido tal dicionário, as chaves do dicionário criado serão os próprios valores sobre os quais foram feitos os subconjuntos.;
-    n= Número de colunas sobre as quais se deseja criar subconjuntos. 
+    n= Número de colunas sobre as quais se deseja criar subconjuntos.
     Seu valor padrão é 1 e caso o valor passado seja 1 mas o tipo de dado do valor passado ao parâmentro colunas não for str,int ou float a função retorna uma str de erro."""
-    
+
     if n==1:
         if type(colunas)!=str and type(colunas)!=int and type(colunas)!=float:
             return "Se o número de colunas sobre as quais se deseja criar subconjuntos (n) for 1, O valor do parâmetro colunas tem que ser str ou float ou int."
@@ -223,7 +225,7 @@ class ModificarDados():
             subcjts_lst=[list(tabela.groupby([i])) for i in colunas]
             leg_sub=[i for i in subcjts_lst]
             return [dict(i) for i in leg_sub]
-          
+
   def criar_subcjtcond(self,tabela,colunas=None,condicoes=None,q=None):
       """Retorna uma tabela do subconjunto dos itens cujos valores das colunas fornecidas obedecem uma ou mais condicoes a partir de uma tabela fornecida.
     Argumentos/Parâmetros:
@@ -238,13 +240,13 @@ class ModificarDados():
               q=col_cond[0]
       subcjt=tabela.query(q)
       return subcjt
-    
+
   def juntar_endereco(self,tabela_original):
-    
+
     '''Transforma as Colunas Originais da Tabela fornecida (excluindo bairro) para uma coluna somente que possui as mesmas
     informações em tipo string separadas por vírgulas e retorna uma cópia da tabela original com a coluna transformada e
     sem as colunas cujas informações foram agrupadas.'''
-    
+
     tabela_cp=tabela_original.copy(deep=True)
     tabela_cp['numero']=[str(i) for i in tabela_cp['numero']]
     linhas_endereco=[list(i) for i in tabela_cp[["logradouro","numero","cidade","uf","cep"]].values]
@@ -255,7 +257,7 @@ class ModificarDados():
     cols=cols[:-3]+cols[-1:]+cols[8:-1]
     tabela_cp=tabela_cp[cols]
     return tabela_cp
-  
+
   def modificar(self):
     #Criando Subconjuntos Para 8 Colunas Selecionadas Para visualizar o perfil dos dados e uma Cópia da Tabela Original de Estudantes
     #Na qual os valores das colunas ['Renda','Motivação' e 'Idade'] são modificadas utilizando a Classe AgrupamentoCondicional
@@ -335,28 +337,28 @@ class ModificarDados():
 
 #Conjunto de Gráficos de Barras Horizontais no qual cada gráfico mostra uma distribuição dos valores de uma determinada coluna na tabela e as porcentagens destes valores em relação ao total
 class PlotarGraficos():
-  
+
   def __init__(self,SM=0):
-    
+
     ''' Inicializa uma Instância da classe Plotar Gráficos que
-    Utiliza os dados gerados pela classe ModificarDados para facilitar a visualização 
+    Utiliza os dados gerados pela classe ModificarDados para facilitar a visualização
     destes através da Criação de Gráficos utilizando a Biblioteca de Plotagem Matplotlib,
     armazena funções as quais cada uma realiza a criação de um ou mais gráficos diferente
     e os salva como um arquivo .jpg no diretório especificado na chamada da função.
-    Aceita o mesmo parâmetro opcional da classe AgrupamentoCondicional 
+    Aceita o mesmo parâmetro opcional da classe AgrupamentoCondicional
     Pois inicializa, através da classe ModificarDados, uma instância desta.'''
-    
+
     #Inicializando uma Instância da Classe ModificarDados e atribuindo ao seu argumento Opcional
     #O mesmo valor passado ao argumento Opcional do inicializador da classe PlotarGraficos
     self.inst_MD=ModificarDados(SM)
     #Utilizando o Método modificar da Instância de ModificarDados para armazenar os dados gerados a partir
     #deste Argumento Opcional em atributos da Instância 'inst_MD'
     self.inst_MD.modificar()
-    
+
   def PlotarHistRendaTO(self,path):
-    
+
     '''Plotagem do Histograma da Renda da tabela armazenada na variável TABESTUDANTES (Tabela Original)'''
-    
+
     fig=mpl.pyplot.figure(constrained_layout=True,figsize=(12,8))
     gs=fig.add_gridspec(3,4,hspace=0.2,wspace=0.2)
     ax=[fig.add_subplot(gs[0,:]),fig.add_subplot(gs[1,0:2]),fig.add_subplot(gs[1,2:4])]
@@ -400,16 +402,16 @@ class PlotarGraficos():
     fig.supylabel("Quantidade de Estudantes",family="Monospace",size=20,weight="bold",x=-0.1)
     fig.supxlabel("Renda",family="Monospace",size=20,weight="bold",x=0.5,y=-0.1)
     mpl.pyplot.savefig(path,dpi=1280,bbox_inches='tight')
-    
-    
+
+
   def PlotarGrafDisp(self,path):
-    
+
     '''Gráfico de Dispersão da Renda em Escala Logaritmica com Linhas Horizontais Representando o Limite de Renda de cada Classe Social'''
-    
+
     def texto_personalizado(pos_x,pos_y,padx,pady,c,texto,ax,ts):
       return ax.text(s=texto,x=pos_x+padx,y=pos_y+pady,fontdict={"family":"Monospace","size":ts,"weight":"bold"},
                      color=c,path_effects=[mpl.patheffects.withStroke(linewidth=1, foreground="black")])
-    
+
     fig,ax=mpl.pyplot.subplots(figsize=(12,8))
     colors=mpl.pyplot.get_cmap("coolwarm")
     rescale = lambda y: (y - np.min(y)) / (np.max(y) - np.min(y))
@@ -438,18 +440,18 @@ class PlotarGraficos():
     ax.set_facecolor((0.65,0.64,0.647,0.09))
     #Salvando em .jpg
     mpl.pyplot.savefig(path,dpi=1280,bbox_inches='tight')
-  
+
   def PlotarGrafDispM(self,path):
-    
+
     '''Mesmo Gráfico de Dispersão porém com linhas horizontais representando a Média das rendas com e sem Outliers,
     os desvios padrões , coeficientes de variações para cada um destes conjuntos e a Mediana do Conjunto com Outliers'''
-    
+
     n_elem,renda_logscale,sm,r_menor,ma_soutlier2,media_a,pct_outliers,cvs,desvio_padrao,d_soutlier=self.inst_MD.GrafDispMData
-    
+
     def texto_personalizado(pos_x,pos_y,padx,pady,c,texto,ax,ts):
       return ax.text(s=texto,x=pos_x+padx,y=pos_y+pady,fontdict={"family":"Monospace","size":ts,"weight":"bold"},color=c,
                      path_effects=[mpl.patheffects.withStroke(linewidth=1, foreground="black")])
-    
+
     fig,ax=mpl.pyplot.subplots(figsize=(12,8))
     colors=mpl.pyplot.get_cmap("coolwarm")
     rescale = lambda y: (y - np.min(y)) / (np.max(y) - np.min(y))
@@ -474,18 +476,18 @@ class PlotarGraficos():
     ax.set_facecolor((0.65,0.64,0.647,0.09))
     ax.legend(prop={"family":"Monospace","weight":"semibold","size":13})
     mpl.pyplot.savefig(path,dpi=1280,bbox_inches='tight')
-    
+
   def PlotarGrafBarras(self,path):
-    
-    '''Conjunto de Gráficos de Barras Horizontais no qual cada gráfico 
-    mostra uma distribuição dos valores de uma determinada 
+
+    '''Conjunto de Gráficos de Barras Horizontais no qual cada gráfico
+    mostra uma distribuição dos valores de uma determinada
     coluna na tabela e as porcentagens destes valores em relação ao total'''
-    
+
     def criar_g_barras(titulo,xy_dict,titulo_ls=20,tick_ls=15,valores_ls=25,sombra_s=4,
                        bgcolor="silver",limx_add=100,padx_valor=10,pady_valor=0.4,
                        pady_titulo=20,ev=False,path=path):
-      
-      """Cria um gráfico de barras horizontais a partir do título e do dicionário de valores fornecidos para x e y usando o pyplot da 
+
+      """Cria um gráfico de barras horizontais a partir do título e do dicionário de valores fornecidos para x e y usando o pyplot da
       biblioteca matplotlib e salva em um arquvio .jpg.
       Argumentos/Parâmetros:
       titulo= Título do gráfico. (str)
@@ -499,14 +501,14 @@ class PlotarGraficos():
       padx_valor= int ou float representando a quantidade de pixels para mover todos os textos em frente as barras no eixo x do gráfico.
       pay_valor= int ou float representando a quantidade de pixels para mover todos os textos em frente as barras no eixo y do gráfico.
       pady_titulo= int ou float representando a quantidade de pixels para mover o texto do título no eixo y: Mais perto , ou longe do começo do gráfico.
-      ev= valor booleano que será usado para gerar as cores do gráfico -- se False o matplotlib.colors é usado para gerar um mapeamento de cores utilizando 
+      ev= valor booleano que será usado para gerar as cores do gráfico -- se False o matplotlib.colors é usado para gerar um mapeamento de cores utilizando
       os valores mínimo e máximo , no  eixo x, dos pontos;
-      --se True gera cores a partir de uma escolha aleatória das cores tab: do matplotlib. Deve ser atribuído TRUE somente se o valor mínimo e o valor 
+      --se True gera cores a partir de uma escolha aleatória das cores tab: do matplotlib. Deve ser atribuído TRUE somente se o valor mínimo e o valor
       máximo dos pontos no eixo x FOR IGUAL.
       """
-      
+
       fig,ax=mpl.pyplot.subplots(figsize=(12,8))
-      ax.set_title(titulo,**{"family":"Monospace","size":titulo_ls,"weight":"bold"},pad=pady_titulo)        
+      ax.set_title(titulo,**{"family":"Monospace","size":titulo_ls,"weight":"bold"},pad=pady_titulo)
       colors=mpl.pyplot.get_cmap("Pastel1")
       rescale = lambda y: (y - np.min(y)) / (np.max(y) - np.min(y))
       if ev==False:
@@ -532,7 +534,7 @@ class PlotarGraficos():
       mpl.pyplot.savefig(path+'{}'.format(titulo.lower().replace(" ","_").replace("/","_")+'.jpg'),dpi=1280,bbox_inches='tight')
     GrafData=self.inst_MD.GrafDistData
     PlotarGrafBarras=[criar_g_barras(**dict(GrafData[i])) for i in GrafData.keys()]
-    
+
 #Definindo a Classe NotasNormalizadas
 
 #tem como propósito Armazenar as funções que alteram os valores das cinco Colunas Primárias Pré-Determinadas,
@@ -574,9 +576,9 @@ class PlotarGraficos():
 #CN=Nota Normalizada da Cor
 
 class NotasNormalizadas():
-  
+
   def __init__(self,tbcp=COLUNASP,SM=0):
-    
+
     '''Inicializa uma Instância da Classe NotasNormalizadas que tem como propósito
     Armazenar as funções que alteram os valores das cinco Colunas Primárias Pré-Determinadas,
     Para cada estudante, com o valor da NotaNormalizada (calculada a partir deste valor)
@@ -584,24 +586,24 @@ class NotasNormalizadas():
     contendo as notas das cinco colunas para cada estudante e tem com índice o RA dos
     estudantes. Aceita o mesmo parâmetro Opcional da classe AgrupamentoCondicional para
     a busca do salário mínimo vigente pois inicializa uma instância desta.'''
-    
+
     self.tbcp=tbcp.copy(deep=True)
     self.inst_AC=AgrupamentoCondicional(SM)
-    
+
   def Criar(self):
     '''Aplica as Funções de Normalização da Nota para os dados de cada Estudante e retorna uma Tabela destas.'''
-    
+
     def RN(r):
       '''Nota Normalizada da Renda: Utiliza o Valor do Salário Mínimo Encontrado pela Classe Agrupamento Condicional
-      
+
       Se Renda for Menor ou Igual a 1 Salários Mínimo: RN=10
       Se Renda for Menor ou Igual a 2 Salários Mínimo e Maior que 1 Salário Mínimo: RN=8
       Se Renda for Maior que 2 salários Mínimo e Menor ou igual a 3 Salários Mínimos: RN=7
       Se Renda for Maior que 3 salários Mínimos e Menor ou igual a 4 Salários Mínimo: RN=6
-      
+
       Se nenhum destes for o caso atribuí notas únicas às classes sociais restantes utilizando o agrupamento da
       instância da classe AgrupamentoCondicional especificada na Inicialização:
-      
+
       Classe C( Renda Maior que 4 e menor ou igual a 10 Salários Mínimos): RN=3
       Classe B( Renda Maior que 10 e menor ou igual a 20 Salários Mínimos): RN=1
       Classe A( Renda Maior que 20 Salários Mínimos): RN=0'''
@@ -624,21 +626,21 @@ class NotasNormalizadas():
           return 1
         elif classe=="C":
           return 3
-        
+
     def EN(e):
       '''Nota Normalizada da Escola: Privada Receba 50% dos Pontos da Escola Pública
-      
+
       Pública: EN=10
       Privada: EN=5'''
-      
+
       if e==1:
         return 10
       else:
         return 5
-      
+
     def CurN(c):
       '''Nota Normalizada Dos Cursos: 1 nota diferente para cada curso:
-      
+
       "Ciência de Dados": CurN=10
       "Direito": CurN=4
       "Medicina": CurN=3
@@ -649,7 +651,7 @@ class NotasNormalizadas():
       "Ciência da Computação": CurN=10
       "Filosofia": CurN=1
       '''
-      
+
       if c==1:
         return 10
       elif c==2:
@@ -668,27 +670,27 @@ class NotasNormalizadas():
         return 10
       else:
         return 1
-      
+
     def CN(cor):
-      
+
       '''Nota Normalizada da Cor: Estudantes Brancos Recebem 80% da nota dos Estudantes Pretos
       Branco: CN=8
       Preto: CN=10'''
-      
+
       if cor==1:
         return 8
       else:
         return 10
-      
+
     n_renda=self.tbcp['renda'].apply(RN)
     n_escola=self.tbcp['escola'].apply(EN)
     n_curso=self.tbcp['cod_curso'].apply(CurN)
     n_cor=self.tbcp['cor'].apply(CN)
     n_motiv=self.tbcp['motivação']
-    notas=pd.DataFrame(columns=['Renda','Escola','Motivação','Curso','Cor'],data=[(a,b,c,d,e) for a,b,c,d,e in 
+    notas=pd.DataFrame(columns=['Renda','Escola','Motivação','Curso','Cor'],data=[(a,b,c,d,e) for a,b,c,d,e in
                                                                               zip(n_renda,n_escola,n_motiv,n_curso,n_cor)],index=self.tbcp.index)
     return notas
-  
+
 #Definindo a Classe NovosPesos
 
 #Classe criada com a finalidade de realizar análises separadas sobre como diferentes pesos da Média Ponderada aplicados sobre
@@ -711,12 +713,12 @@ class NotasNormalizadas():
 
 class NovosPesos():
   def __init__(self,pesos_arr):
-    
-    '''Classe criada com a finalidade de realizar análises separadas sobre 
+
+    '''Classe criada com a finalidade de realizar análises separadas sobre
        como diferentes pesos da Média Ponderada aplicados sobre as notas normalizadas
        dos estudantes influenciam no processo de aprovação ou rejeição destes no processo.
        Desta forma facilitando o entendimento humano dos perfis dos estudantes aprovados, ou não ,
-       resultantes da aplicação dos pesos passados como parâmetros, além de permitir a checagem manual 
+       resultantes da aplicação dos pesos passados como parâmetros, além de permitir a checagem manual
        da frequência de estudantes aprovados ou rejeitados pertencentes a um subgrupo do total.
        Desta forma cada instância da classe inicializada para um array de pesos específicos representa as análises
        ,unicas, citadas para o array de pesos fornecidos. Utiliza a Variável Local COLUNASP (Pré-Definida) e a
@@ -724,22 +726,22 @@ class NovosPesos():
        os RAs destes.) gerada no momento de criação do Módulo (4/05/2022) utilizando a classe NotasNormalizadas
        utilizando o Salário Mínimo vigente no período citado por motivos de otimização, logo para altera-la basta
        mudar o valor da Variável Local no Ambiente de Execução.'''
-    
+
     #Fazendo uma Cópia da Tabela de Colunas Primárias
     colunas_pc=COLUNASP.copy(deep=True)
-    #Transformando os valores da Tabela de Notas em um array do Numpy e Calculando a Média Ponderada para cada 
+    #Transformando os valores da Tabela de Notas em um array do Numpy e Calculando a Média Ponderada para cada
     #estudante utilizando a função dot do Numpy que, como notas tem formato (500,5) e o array de pesos (1,5)
     #Calcula a Soma do produto interno de cada array de Notas pelo array de Pesos,produzindo um array de formato
     #(500,1) que representa a soma NNi*pi, sendo NNi a Nota Normalizada de indice i do estudante e pi o Peso de
     #Índice i do array de pesos. Portanto para obter a Média Ponderada dividimos esse array por um array de de mesmo
-    #formato com o valor da soma dos pesos repetidos já que o operador '/' quando aplicados a arrays, de mesma 
-    #dimensionalidade,do numpy retorna um array novo em que cada elemento de índice i é a divisão do elemento de índice i 
+    #formato com o valor da soma dos pesos repetidos já que o operador '/' quando aplicados a arrays, de mesma
+    #dimensionalidade,do numpy retorna um array novo em que cada elemento de índice i é a divisão do elemento de índice i
     #do primeiro array pelo elemento de índice i do segundo array, Logo ,no caso em questão, o valor atribuído à variável
     #mp é um array de formato (500,1) em que cada elemento corresponde à Média Ponderada de cada estudante seguindo o índice
     #da tabela NOTAS que é o mesmo da tabela COLUNASP.
     notas_arr=NOTAS.to_numpy()
     mp=dot(notas_arr,pesos_arr)/array([sum(pesos_arr)]*500)
-    #Calculando o Limite de Aprovação Representado como uma Mp a partir de 80% 
+    #Calculando o Limite de Aprovação Representado como uma Mp a partir de 80%
     #do valor máximo permitido pelos pesos para Mp
     l_appr=(dot(array([10,10,10,10,10]),pesos_arr)/sum(pesos_arr))*0.8
     colunas_pc['Mp']=mp
@@ -775,7 +777,7 @@ class NovosPesos():
                                 'Pct Aprovados':['{}%'.format(round((a/(a+b))*100,2)) for a,b in zip(freqs_dict[k],freqsn_dict[k])],
                                 'Pct Não Aprovados':['{}%'.format(round((b/(a+b))*100,2)) for a,b in zip(freqs_dict[k],freqsn_dict[k])]},
                                  index=v.values()) for k,v in zip(freqs_dict.keys(),col_por_cod)}
-                
+
     appr_filt={'Curso':apprfilt[:9],'Escola':apprfilt[9:11],'Sexo':apprfilt[11:13],'Cor':apprfilt[13:]}
     naoappr_filt={'Curso':naoapprfilt[:9],'Escola':naoapprfilt[9:11],'Sexo':naoapprfilt[11:13],'Cor':naoapprfilt[13:]}
     #Atribuindo a Tabela COLUNASP alterada com as colunas 'Mp' e 'Termos_p' dependentes do parâmetro array de pesos
@@ -789,7 +791,7 @@ class NovosPesos():
     self.naprovados=dfnappr
     self.l_appr=l_appr
     self.n_max=mp.max()
-      
+
   def __str__(self):
     return 'Análise de Resultados para Pesos:\nRenda:{}\nEscola:{}\nMotivação:{}\nCurso:{}\nCor:{}'.format(self.pesos[0],self.pesos[1],
                                                                                                            self.pesos[2],self.pesos[3],
@@ -799,23 +801,23 @@ class NovosPesos():
                                                                                                            self.pesos[2],self.pesos[3],
                                                                                                            self.pesos[4])
   def qtd_total(self):
-    
+
     '''Função Utilizada para retornar uma Tabela do Pandas cujos índices são Aprovados e Não Aprovados e as
     colunas são "Quantidade" que contém o número de aprovados e não aprovados e "Pct do Total" que contém
     A porcentagem do Total de Estudantes que cada grupo representa.'''
-    
+
     freqs=[len(self.aprovados),len(self.naprovados)]
     total=sum(freqs)
     pcts=['{}%'.format(round((i/total)*100,2)) for i in freqs]
     tabela=pd.DataFrame({'Quantidade':freqs,'Porcentagens':pcts},index=['Aprovados','Não Aprovados'])
     return tabela
-  
+
   def agrupar_por_mp(self):
-    
+
     '''Função Utilizada para retornar um dicionário cujas chaves são os Nomes dos Subgrupos da Tabela Alterada criada
     a partir de limites definidos para o valor da coluna "Mp" e cujos valores são Tabelas do Pandas que contém estes
     respectivos subconjuntos.'''
-    
+
     def group_freq(mp):
       if mp>=self.l_appr:
         return 1
@@ -826,7 +828,7 @@ class NovosPesos():
       else:
         return 4
     grupos=self.tabela_alterada['Mp'].apply(group_freq)
-    grupos_dict={k:self.tabela_alterada.loc[grupos.apply(lambda x:x if x==v else None).dropna().index] for k,v in 
+    grupos_dict={k:self.tabela_alterada.loc[grupos.apply(lambda x:x if x==v else None).dropna().index] for k,v in
                  zip(['Maior que {}'.format(self.l_appr),'Entre {} e {}'.format(self.n_max*0.7,self.l_appr),'Entre {} e {}'.format(self.n_max*0.4,self.n_max*0.7),
                       'Menor que {}'.format(self.n_max*0.4)],[1,2,3,4])}
     medias={}
@@ -835,16 +837,16 @@ class NovosPesos():
         medias[g]=np.mean(array([array(i) for i in df['Termos_p'].to_numpy()]),axis=0)
     self.grupo_medias=medias
     return grupos_dict,medias
-  
+
   def grafico_rede(self,RA,mostrar_media=None):
-    
-    '''Método de Criação de um gráfico de rede interativo cujos vértices são os Termos gerados pela multiplicação 
-    das notas normalizadas de um estudante qualquer pelo peso da sua respectiva coluna, 
+
+    '''Método de Criação de um gráfico de rede interativo cujos vértices são os Termos gerados pela multiplicação
+    das notas normalizadas de um estudante qualquer pelo peso da sua respectiva coluna,
     permitindo assim a análise de quais colunas primárias mais estão influenciando na filtragem dos estudantes.
-    de uma lista de estudantes (Referenciados por uma string na lista "RA" que corresponde ao seu RA) 
+    de uma lista de estudantes (Referenciados por uma string na lista "RA" que corresponde ao seu RA)
     ou uma média feita para os termos dos estudantes presentes nos 4 subgrupos criados pelo método "agrupar_por_mp"
     cuja inclusão pode ser controlada pela varável de controle "mostrar_media" definida como None por Padrão.'''
-    
+
     colunas=['Renda','Escola','Motivação','Curso','Cor','Renda']
     rs=[np.append(a,a[0]) for a in [np.array(self.tabela_alterada.loc[i]['Termos_p']) for i in RA]]
     cpdf_lst=[pd.DataFrame(dict(r=r,theta=colunas)) for r in rs]
@@ -925,22 +927,22 @@ class NovosPesos():
 
 class GeradorPesos():
   def __init__(self,pmin,pmax,qtd):
-    
+
     '''Retorna um Array do Numpy de formato [qtd,5] no qual cada linha representa um Array de Pesos Aleatórios Diferentes, sendo que
     o valor mínimo para qualquer elemento de qualquer um dos arrays é pmin e o valor máximo e pmax. A quantidade de arrays de
     Pesos Aleatórios geradas é controlada pelo parâmetro qtd ,que controla o formato do array gerado. Os Valores são retirados de
     uma distribuição uniforme utilizando Numpy.random.uniform '''
-    
+
     self.pmin=pmin
     self.pmax=pmax
     self.qtd=qtd
     self.pesos_possiveis=np.random.uniform(pmin,pmax,(qtd,5))
-    
+
   def __str__(self):
     return 'Gerador de Pesos Possíveis para a Média Ponderada Sendo que\nPeso Min:{}\nPeso Max:{}'.format(self.pmin,self.pmax)
   def __repr__(self):
     return 'Gerador de Pesos Possíveis para a Média Ponderada Sendo que\nPeso Min:{}\nPeso Max:{}'.format(self.pmin,self.pmax)
-  
+
 #Definindo a Classe TestePeso
 
 #Classe que contém somente uma função de inicialização a qual tem como parâmetro um array de pesos e a partir deste retorna
@@ -966,7 +968,7 @@ class TestePeso():
       total=apprfilt+naoapprfilt
       self.pdarr=append(array((len(appr))),apprfilt/total)
       self.l_appr=l_appr
-    
+
 #Definindo a Classe TestarPesoAPI
 
 #Classe utilizada para fazer múltiplas chamadas simultâneas à API de testagem dos pesos, para acelerar a busca pelos pesos filtrados, utilizando a função ThreadPoolExecutor do Módulo concurrent.features do Python ; Lidar com erros retornados pela API e formatar as múltiplas respostas bem-sucedidas em uma resposta unificada correspondente à agregação de todas as respostas obtidas
@@ -982,32 +984,32 @@ class TestePeso():
 
 class TestarPesoAPI():
   def __init__(self,pesos_por_vm,limites,n_vms):
-    
+
     '''Inicializa uma instância da classe TestarPesoAPI que armazena os parâmetros de inicialização em
     atributos desta.
     Parâmtros:
-    pesos_por_vm= Quantidade de Pesos que se deseja testar por chamada da API, 
+    pesos_por_vm= Quantidade de Pesos que se deseja testar por chamada da API,
     que executa em uma única MV no ambiente do Google Cloud
-    
+
     limites= Array de Condições das filtragens realizadas dos estudantes quando
     o peso que está sendo testado é usado como peso da Média Ponderada das Notas Normalizadas.
     Passado para a chamada da API em forma de parâmetro na URL.
-    
+
     n_vms= Quantidade de chamadas simultâneas que se deseja realizar à API,
     sendo que cada uma será executada em uma MV diferente no ambiente do Google Cloud.
     '''
-    
+
     self.ppvm=pesos_por_vm
     self.limites=limites
     self.nvms=n_vms
-    
+
   def chamar_api(url):
-    
+
     '''Função que será utilizada pelo ThreadPoolExecutor;Realiza uma única chamada à
     API e retorna o resultado obtido caso a execução tenha sido bem sucedida (Código 200)
     e pausa a execução do programa por 5 segundos (Tempo Médio da chamada) caso não tenha
     (Código diferente de 200)'''
-    
+
     req=requests.get(url)
     if req.status_code==200:
       return req
@@ -1016,21 +1018,21 @@ class TestarPesoAPI():
       nreq=requests.get(url)
       return nreq
   def requests_simultaneos(n_requests,url_lst):
-    
-    '''Funçao  que cria uma fila de execução das chamadas e gerencia a acquisição do resultado destas quando 
-    completadas e atualização da fila de chamadas a serem executadas, executa uma chamada diferente 
+
+    '''Funçao  que cria uma fila de execução das chamadas e gerencia a acquisição do resultado destas quando
+    completadas e atualização da fila de chamadas a serem executadas, executa uma chamada diferente
     por Thread do CPU da máquina de execução podendo-se especificar o número máximo de Threads a se utilizar.'''
-    
+
     with concurrent.futures.ThreadPoolExecutor(max_workers=n_requests) as pool:
       response_lst= list(pool.map(TestarPesoAPI.chamar_api,url_lst))
     return [i for i in response_lst]
-  
+
   def comecar_teste(self):
-    
+
     '''Método que incializa a execução do ThreadPoolWorker com os parâmetros de inicialização fornecidos na
     criação da instância de classe e realiza a formatação e agregação dos resultados obtidos pelas chamadas
     paralelas em uma única resposta unificada.'''
-    
+
     url='http://us-central1-pessoal-1802.cloudfunctions.net/econtrar-pesos?qtd_pesos={}&limites={}'.format(self.ppvm,self.limites)
     response_lst=TestarPesoAPI.requests_simultaneos(self.nvms,[url]*self.nvms)
     response_unificada={}
@@ -1062,3 +1064,225 @@ class TestarPesoAPI():
     pesosap=np.array(R_c5)
     response_unificada['pesos']=pesosap
     return response_unificada,erros
+
+class FiltragemKMeans():
+
+  def __init__(self,pesos_arr,n_subcjts,tol=10):
+
+    '''Inicializa uma instância da classe FiltragemKMeans utilizando os parâmetros fornecidos que são um array de pesos
+    para as 5 colunas principais (Que será passado para a classe NovosPesos) e o número de subconjuntos pré-determinado
+    para o modelo do algoritmo KMeans. Aceita um parâmetro opcional que é a tolerância do modelo da instância que por
+    padrão tem valor igual a 10.'''
+
+    #Iniciliazando uma instância da classe NovosPesos para obter as análises da filtragem realizada pelo
+    #peso fornecido como parâmetro, incluindo as Médias Ponderadas dos alunos quando se utiliza tais pesos.
+    self.inst_NP=NovosPesos(pesos_arr)
+    #Inicializando um modelo do algoritmo de clustering KMeans implementado pela biblioteca scikit-learn e
+    #pré-definindo a quantidade de clusters (Subconjuntos) para o valor do parâmetro n_subcjts fornecido
+    #Armazenando o modelo, valor do parâmetro n_subcjts e valor do parâmetro opcional tol em atributos da instância
+    self.tol=tol
+    self.n_subcjts=n_subcjts
+    self.modelo=KMeans(n_clusters=n_subcjts,init='k-means++',n_init=1000,max_iter=1000,tol=tol,algorithm='full')
+    #Criando atributos vazios da instância para valores/objetos de interesse que serão salvos após a finalização
+    #do treino do modelo utilizando as Médias Ponderadas dos alunos quando utilizado o peso fornceido.
+    self.medias=None
+    self.centros=None
+    self.legenda_predict=None
+    self.tabelaalt_classificada=None
+    self.indice=None
+    self.subgps=None
+    self.subgpsalt=None
+
+  def treinar(self):
+
+    '''Treina o modelo do algoritmo KMeans da instância utilizando as Médias Ponderadas dos estudantes quando se utiliza o peso fornecido
+    como parâmetro de incialização para a instância e armazena informações de interesse geradas após o treino em atributos da instância.'''
+
+    #Fazendo uma cópia da tabela de estudantes com a Média Ponderada destes quando utilizado o peso fornecido,
+    #removendo os outliers (Estudantes com renda maior que 4 Salários Mínimos) e guardando um array da Média Ponderada
+    #de cada estudante da tabela sem outliers na variável 'array_entrada' que será utilizada pelo algoritmo para o treino.
+    tabela=self.inst_NP.tabela_alterada.copy(deep=True).query('renda<=4848')
+    tabela_mod=tabela['Mp'].to_numpy()
+    array_entrada=tabela_mod.reshape(-1,1)
+    #Realizando o treino do modelo
+    self.modelo.fit(array_entrada)
+    #Criando uma coluna na cópia da tabela na qual os valores são as legendas dadas pelo modelo para os subconjuntos criados
+    tabela['Id_Sub']=self.modelo.labels_
+    #Criando um dicionário no qual os valores são as legendas dadas pelo modelo para os subconjuntos criados e os valores
+    #São tabelas que contém somente os estudantes pertencentes ao subconjunto cuja legenda é a chave. Armazenando este
+    #dicionário no atributo subgps da instância
+    subgps={i:tabela.query(f'Id_Sub=={i}') for i in range(self.n_subcjts)}
+    self.subgps=subgps
+    #Criando tabela cujas colunas são as Médias da renda,motivação e mp dos estudantes pertencentes a cada subconjunto e
+    #a quantidade total de estudantes em cada subconjunto e o índice é a lista das legendas dadas pelo modelo para os subconjuntos.
+    SubgpsMedias=pd.DataFrame({'Média Renda':[i['renda'].mean() for i in subgps.values()],
+                               'Média Motivação':[i['motivação'].mean() for i in subgps.values()],
+                               'Média Mp':[i['Mp'].mean() for i in subgps.values()],
+                               'Qtd Total':[len(i) for i in subgps.values()]},index=[f'Subcjt {i}' for i in range(self.n_subcjts)])
+    #Ordenando a tabela de médias do subconjuntos em ordem decrescente da Média das mp dos estudantes e criando uma lista das legendas
+    #dos Subconjuntos em ordem decrescente da média das mps dos subconjuntos.
+    #Criando nova legenda para os subconjuntos na qual 0 representa o conjunto com a maior Média das mps e (n_subcjts-1) representa o
+    #Subconjunto com a menor Média.
+    #Criando dicionário para realizar a conversão das novas legendas criadas para as legendas dadas pelo modelo e armazenando-o no
+    #atributo 'indice' da instância
+    indice={v:k for k,v in
+            zip([int(i.replace('Subcjt ','')) for i in list(SubgpsMedias.sort_values('Média Mp',ascending=False).index)],
+                range(self.n_subcjts))}
+    self.indice=indice
+    #Criando função anônima para retornar 'Aprovados' caso a legenda nova do subconjunto for 0 e 'Não Aprovados-Sub {Legenda Nova do Subconjunto}' caso contrário.
+    od=lambda x: 'Aprovados' if x==0 else f'Não Aprovados-Sub {x}'
+    #Criando dicionário inverso do dicionário indice que converte as legendas dadas pelo modelo para as novas legendas criadas e armazenando-o
+    #no atributo 'legenda_predict' da instância.
+    mappredict={k:v for v,k in indice.items()}
+    #Alterando os valores da coluna das legendas dos subconjuntos das legendas dadas pelo modelo para as novas legendas criadas.
+    #Armazenando a nova tabela no atributo 'tabelaalt_classificada' da instância.
+    tbaltc=tabela['Id_Sub'].apply(lambda x: mappredict[x])
+    tbaltc_=tbaltc.apply(od)
+    tbalt=tabela.copy(deep=True)
+    tbalt['Id_Sub']=tbaltc_
+    self.tabelaalt_classificada=tbalt
+    #Alterando o índice da tabela de médias para o retorno da função anônima od criada quando fornecidas as novas legendas criadas.
+    #Armazenando a nova tabela de médias no atributo 'medias' da instância
+    novo_ind=[od(i) for i in indice.keys()]
+    self.medias=SubgpsMedias.sort_values('Média Mp',ascending=False).set_index(array(novo_ind))
+    #Armazenando os 'centros' dos subconjuntos criados (que são valores de mp já que o modelo foi treinado em valores deste tipo) no
+    #atributo 'centros' da instância
+    self.centros=[i[0] for i in flipud(sort(self.modelo.cluster_centers_,axis=0))]
+    #Armazenando o dicionário (cujas chaves são as novas legendas criadas dos subconjuntos e os valores são tabelas que contém somente
+    #os estudantes pertencentes ao subconjunto representado pela chave) no atributo 'subgpsalt' da intância
+    self.subgpsalt={i:tbalt.query(f"Id_Sub=='{i}'") for i in tbaltc_}
+    self.legenda_predict=mappredict
+
+  def GrafDisp(self,path,mostrar_limitesy=False,centro_de_clusters=False,tendencia_centros=False):
+
+    '''Realiza a plotagem de um gráfico de dispersão da renda dos estudantes no eixo x e a Média Ponderada destes no eixo y
+    (sem incluir os estudantes considerados outliers em questão da renda). Sendo que a cor do ponto que representa um estudante
+    depende do subconjunto do qual este faz parte. Utilizando a biblioteca matplotlib para a plotagem e a biblioteca seaborn
+    para estilização.
+
+    Oferece a opção de plotar:
+
+    1- Linhas horizontais dos valores de Mp que representam os "centros" dos subconjuntos, controlada pelo parâmetro "mostrar_limitesy"
+
+    2- Pontos cujo valor no eixo y são os valores de Mp que representam os "centros" dos subconjuntos e cujo valor no eixo x são as médias
+    da renda dos estudantes pertencentes ao subconjunto em questão, controlada pelo parâmetro "centro_de_clusters"
+
+    3- Curva que passa por todos os Pontos plotados na opção 2 que representa a tendência dos "centros" dos subconjuntos, controlada pelo
+    parâmetro "tendencia_centros".
+
+    Salva o gráfico em um arquivo .jpg no diretório especificado pelo parâmetro "path".'''
+
+    colors=random.choices(list(mpl.colors.CSS4_COLORS.keys()),k=self.n_subcjts)
+    fig,ax=mpl.pyplot.subplots(figsize=(19,10))
+    seaborn.set_theme(context='notebook',style='darkgrid',palette='pastel')
+    for i,c,clust in zip(self.indice.keys(),colors,self.centros):
+      if i==0:
+        ax.scatter(self.subgps[self.indice[i]]['renda'],self.subgps[self.indice[i]]['Mp'],color=c,label=f'Aprovados')
+      else:
+        ax.scatter(self.subgps[self.indice[i]]['renda'],self.subgps[self.indice[i]]['Mp'],color=c,label=f'Não Aprovado-Sub {i}')
+      if mostrar_limitesy==True:
+        ax.axhline(clust,0,5000,color=c,linestyle='dashed')
+      elif centro_de_clusters==True:
+        ax.plot(self.subgps[self.indice[i]]['renda'].mean(),clust,color=c,marker='h',ms=20,
+                path_effects=[matplotlib.patheffects.PathPatchEffect(edgecolor='black',linewidth=1.6,offset=(2,-1.08),
+                                                                     facecolor='grey',hatch='/'),
+                              matplotlib.patheffects.PathPatchEffect(edgecolor='black', linewidth=1.2, facecolor=c)])
+
+    if tendencia_centros==True:
+      MediaOd=self.medias
+      Ccs=self.centros
+      MpsPossiveis=[linspace(Ccs[i],Ccs[i+1],19*10**5) for i in range(self.n_subcjts-1)]
+      RendasPossiveis=[linspace(MediaOd['Média Renda'].iloc[i],MediaOd['Média Renda'].iloc[i+1],19*10**5) for i in range(self.n_subcjts-1)]
+      for Mpp,Rp in zip(MpsPossiveis,RendasPossiveis):
+        ax.plot(Rp,Mpp,color='black',path_effects=[matplotlib.patheffects.SimpleLineShadow(),
+                                               matplotlib.patheffects.Normal(),
+                                               matplotlib.patheffects.Stroke(linewidth=3,foreground='black')],linewidth=4,
+                linestyle='dashed')
+
+    tick_font=mpl.font_manager.FontProperties(family='Monospace',size=15,weight='bold')
+    for x_ticks in ax.get_xticklabels():
+      x_ticks.set_fontproperties(tick_font)
+    for y_ticks in ax.get_yticklabels():
+      y_ticks.set_fontproperties(tick_font)
+    fig.suptitle('Gráfico de Dispersão Subconjuntos',family='Monospace',size=35,weight='bold',path_effects=[matplotlib.patheffects.withStroke(offset=(2,-2),linewidth=0.8)])
+    ax.legend(prop={'family':'Monospace','size':18,'weight':'bold'},shadow=True,markerscale=2)
+    fig.supxlabel(y=0.03,t='Renda (R$)',fontproperties={'family':'Monospace','size':20,'weight':'bold'},path_effects=[matplotlib.patheffects.withStroke(offset=(1,-1),linewidth=0.5)])
+    fig.supylabel(x=0.07,t='Média Ponderada',fontproperties={'family':'Monospace','size':20,'weight':'bold',},path_effects=[matplotlib.patheffects.withStroke(offset=(1,-1),linewidth=0.5)])
+    mpl.pyplot.savefig(path,bbox_inches='tight',dpi=1280)
+
+  def classificar(self,mps_arr):
+
+    '''Classifica os estudantes cujas Médias Ponderadas são os valores dos elementos do array fornecido no parâmetro
+    "mps_arr" como pertencentes a um dos subconjuntos gerados pelo modelo e retorna a nova legenda criada para o subconjunto
+    ao qual o estudante pertence.'''
+
+    #Modificando o formato do array fornecido para possibilitar a classificação utilizando o modelo
+    entrada=mps_arr.reshape(-1,1)
+    return [self.legenda_predict[i] for i in self.modelo.predict(entrada)]
+
+  def analisar_filtragem(self):
+
+    '''Realiza uma análise da filtragem realizada dos estudantes considerando os Aprovados como os estudantes pertencentes ao
+    Subconjunto de maior Média de mps (cuja legenda nova criada é 0) e os Não Aprovados como os estudantes pertencentes a todos
+    os outros subconjuntos. As quantidades e porcentagens da análise são calculadas de forma semelhante à forma utilizada para calcular
+    as quantidades e porcentagens da análise feita pela classe NovosPesos. O que permite a inclusão da comparação destas duas análises
+    no retorno do método.'''
+
+    #Utilizando o método "classificar" da instância para descobrir os subconjuntos nos quais os outliers se ecnontram e
+    #,consequentemente, se foram aprovados ou não.
+    #Adicionando os outliers classificados à tabela dos estudantes classificados sobre a qual será realizada a análise.
+    tbalt_c=self.tabelaalt_classificada.copy(deep=True)
+    Lb=tbalt_c['Id_Sub'].apply(lambda x:1 if x=='Aprovados' else 0)
+    tbalt_c['BL']=Lb
+    od=lambda x: 'Aprovados' if x==0 else f'Não Aprovados-Sub {x}'
+    tbNP=self.inst_NP.tabela_alterada.query('renda>4848').copy(deep=True)
+    tbNP['Id_Sub']=[od(i) for i in self.classificar(tbNP['Mp'].to_numpy())]
+    #Aplicando a função anônima que retorna 1 para estudantes pertencentes ao subconjunto dos aprovados
+    #(Subconjunto de maior média das mps e cuja legenda nova criada é 0) e 0 para estudantes pertencentes aos
+    #outros subconjuntos (que juntos representam o subconjunto dos Não Aprovados).
+    tbNP['BL']=tbNP['Id_Sub'].apply(lambda x:1 if x=='Aprovados' else 0)
+    tbalt_c_=tbalt_c.append(tbNP)
+    tbalt_arr=tbalt_c_.to_numpy()
+    #Filtrando os estudantes Aprovados e Não Aprovados para cada valor possível de cada coluna primária
+    appr,nappr=tbalt_arr[where(tbalt_arr[:,-1]==1)],tbalt_arr[where(tbalt_arr[:,-1]==0)]
+    dfappr,dfnappr=tbalt_c_.iloc[where(tbalt_arr[:,-1]==1)],tbalt_c_.iloc[where(tbalt_arr[:,-1]==0)]
+    cp={3:(1,2,3,4,5,6,7,8,9),1:(1,2),5:(1,2),4:(1,2)}
+    apprfilt=[dfappr.iloc[where(dfappr.to_numpy()[:,k]==a)] for k in cp.keys() for a in cp[k]]
+    naoapprfilt=[dfnappr.iloc[where(dfnappr.to_numpy()[:,k]==a)] for k in cp.keys() for a in cp[k]]
+    #Criando array no qual os elementos são a quantidade de alunos aprovados ou não aprovados de um determinado
+    #subconjunto dos estudantes (Valores específicos de uma das colunas)
+    qtd_apprfilt=array([len(i) for i in apprfilt])
+    qtd_napprfilt=array([len(i) for i in naoapprfilt])
+    #Fazendo a soma de cada elemento i do array dos aprovados com o elemento i dos não aprovados o que resulta
+    #em um array contendo a quantidade total de estudantes em determinado subconjunto e Fazendo uma Tabela do Pandas contendo
+    #A quantidade de aprovados,quantidade de não aprovados,pct de aprovação e pct de não aprovação para cada subconjunto
+    total=qtd_apprfilt+qtd_napprfilt
+    freqs_dict={'curso':qtd_apprfilt[:9],'escola':qtd_apprfilt[9:11],'sexo':qtd_apprfilt[11:13],'cor':qtd_apprfilt[13:]}
+    freqsn_dict={'curso':qtd_napprfilt[:9],'escola':qtd_napprfilt[9:11],'sexo':qtd_napprfilt[11:13],'cor':qtd_napprfilt[13:]}
+    col_por_cod=[{0:"Ciência de Dados",1:"Direito",2:"Medicina",3:"História",
+                      4:"Administração",5:"Engenharia Biomédica",6:"Design",7:"Ciência da Computação",8:"Filosofia"},
+                   {0:"Pública",1:"Privada"},
+                   {0:"Masculino",1:"Feminino"},
+                   {0:"Branco",1:"Preto"}]
+    freq_df_dict={k:pd.DataFrame({'Aprovados':freqs_dict[k],'Não Aprovados':freqsn_dict[k],
+                                'Pct Aprovados':['{}%'.format(round((a/(a+b))*100,2)) for a,b in zip(freqs_dict[k],freqsn_dict[k])],
+                                'Pct Não Aprovados':['{}%'.format(round((b/(a+b))*100,2)) for a,b in zip(freqs_dict[k],freqsn_dict[k])]},
+                                 index=v.values()) for k,v in zip(freqs_dict.keys(),col_por_cod)}
+    #Calculando a diminuição da porcentagem de aprovados para cada valor possível de cada coluna primária quando comparadas
+    #a filtragem feita pelo limite de aprovação 8 da Média Ponderada dos estudantes e a filtragem feita pelo modelo do algoritmo
+    #KMeans da instância quando treinado utilizando as Médias Ponderadas dos estudantes considerados não outliers no quesito renda.
+    for k in freq_df_dict.keys():
+      pctapprNP=array([float(i.replace('%','')) for i in self.inst_NP.qtds[k]['Pct Aprovados']])
+      pctapprKM=array([float(i.replace('%','')) for i in freq_df_dict[k]['Pct Aprovados']])
+      freq_df_dict[k]['Diminuição na Pct de Aprovação']=[f'{round(i,2)}%' for i in (pctapprNP-pctapprKM)]
+    appr_filt={'Curso':apprfilt[:9],'Escola':apprfilt[9:11],'Sexo':apprfilt[11:13],'Cor':apprfilt[13:]}
+    naoappr_filt={'Curso':naoapprfilt[:9],'Escola':naoapprfilt[9:11],'Sexo':naoapprfilt[11:13],'Cor':naoapprfilt[13:]}
+    #Calculando a quantidade total de estudantes aprovados e Não Aprovados e a porcentagem que estes representam do total.
+    qtdt=pd.DataFrame({'Quantidade':[len(appr),len(nappr)],'Pct do Total':[f'{(len(appr)/500)*100}%',f'{(len(nappr)/500)*100}%']},index=['Aprovados','Não Aprovados'])
+    return {'qtds':freq_df_dict,'aprovados':dfappr,'naprovados':dfnappr,'appr_filt':appr_filt,'nappr_filt':naoappr_filt,'qtd_total':qtdt}
+
+  def __str__(self):
+    return f'Análise da filtragem dos estudantes realizada\npor um modelo do algoritmo KMeans com:\nnúmero pré determinado de clusters={self.n_subcjts}\ntolerância={self.tol}\nTreinado utilizando as médias ponderadas dos estudantes\nquando os pesos desta são:\n{self.inst_NP.pesos}'
+
+  def __repr__(self):
+    return f'FiltragemKMeans(pesos_arr={self.inst_NP.pesos},n_subcjts={self.n_subcjts},tol={self.tol})'
