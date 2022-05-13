@@ -110,6 +110,10 @@ paralelamente.
 >> - *pesos_por_vm* = Quantidade de Pesos que se deseja testar por chamada da API, que executa em uma única MV no ambiente do Google Cloud.
 >> - *limites* = Array de Condições das filtragens realizadas dos estudantes quando o peso que está sendo testado é usado como peso da Média Ponderada das Notas Normalizadas. Passado para a chamada da API em forma de parâmetro na URL.
 >> - *n_vms* = Quantidade de chamadas simultâneas que se deseja realizar à API, sendo que cada uma será executada em uma MV diferente no ambiente do Google Cloud.
+>
+>> *FiltragemKMeans*
+>>
+>
 
 ### Módulo Gerente
 >
