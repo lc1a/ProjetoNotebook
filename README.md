@@ -188,6 +188,10 @@ paralelamente.
 >>   - **'EMAIL'**: Email do Estudante
 >>     
 >> - *deferido* = Valor booleano (True ou False) indicando se a solicitação do aluno foi deferida ou não.
+>> 
+>> - *driver_exe_path* = Diretório no qual se encontra o WebDriver que será utilizado pela biblioteca Selenium
+>>
+>> - *headless* = Opção fornecida à instância do Driver da biblioteca selenium para começar a execução do navegador omitindo a janela sendo aberta.
 >
 ### Módulo ProcessoAutomatizado
 >
@@ -218,4 +222,9 @@ paralelamente.
 >> - *dir_arq_csv* = diretório local para salvar .csv referente ao histórico das solicitações.
 >>   
 >> - *filtkmeans* = Instância da classe ProjetoNotebook.Analista.FiltragemKMeans.
+>>
+>> - *driver_exe_path* = Diretório no qual se encontra o WebDriver que será utilizado pela biblioteca Selenium
+>>
+>> - *headless* = Opção fornecida à instância do Driver da biblioteca selenium para começar a execução do navegador omitindo a janela sendo aberta.
+>>
 >
