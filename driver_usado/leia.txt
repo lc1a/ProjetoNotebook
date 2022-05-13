@@ -1,0 +1,1 @@
+Arquivo Executável do WebDriver Gecko utilizado para o navegador Firefox utilizando durante desenvolvimento.
