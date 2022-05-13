@@ -113,20 +113,109 @@ paralelamente.
 >
 >> *FiltragemKMeans*
 >>
->
-
+>>**Parâmetros de Inicialização**
+>>
+>> - *pesos_arr* = Array do Numpy de pesos para as 5 colunas principais (Que será passado para a classe NovosPesos)
+>>
+>> - *n_subcjts* = número de subconjuntos pré-determinado para o modelo do algoritmo KMeans.
+>>
+>> - *tol* = (Opcional) tolerância do modelo da instância que por padrão tem valor igual a 10.
+>>
+>>Classe que tem como função criar um Modelo do algortimo de clustering KMeans, implmentado pela biblioteca scikit-learn, a partir dos parâmtros de
+>>inicialização fornecidos e treiná-lo utilizando as 500 Médias Ponderadas das Notas Normalizadas dos Estudantes quando se utiliza na fórmula os pesos
+>>fornecidos no parâmtro *pesos_arr*. Após o treino oferece métodos para:
+>>
+>> - Classificar Novos estudantes a partir de suas Médias Ponderadas utilizando o modelo,
+>> 
+>> - Plotar um gráfico de dispersão da renda dos estudantes noeixo x e a Média Ponderada destes no eixo y no qual a cor do ponto que representa oestudante
+>>   depende de qual subconjunto o estudante pertence, com o intuito de visualizar graficamente a Filtragem e divisão feita pelo modelo.
+>>   
+>> - Realizar uma análise das porcentagens de aprovação para estudantes pertencentes a todos os diferentes subconjuntos definidos pelo valor específico de
+>>   uma das 5 colunas primárias, (Considerando os aprovados como sendo o Subconjunto encontrado pelo modelo no qual a Média da Mp dos estudantes é máxima),
+>>   e comparar esta análise com a mesma análise feita para o peso utilizado quando os aprovados são considerados como aqueles com Média Ponderada maior que
+>>   8.
+>>   
 ### Módulo Gerente
 >
 >**Classes:**
 >>*HistoricoSolicitacoes*
->>
+>> - Classe que tem como função armazenar novas solicitações, ler e editar
+>>   um arquivo .csv de nome "historico_s.csv" no diretório local do usuário especificado pelo parâmetro "dir_arq_csv".
+>>   
+>> - Caso um arquivo .csv com este nome não exista no diretório local especificado pelo usuário, um novo será criado. 
+>> 
+>> - Caso já exista a instância abrirá este arquivo como uma tabela do pandas e cada edição feita utilizando a instância
+>>   terá impacto no arquivo .csv já existente.
 >
 >>*InformarEstudante*
 >>
+>>Classe que possui todas as informações necessárias,
+>>de um estudante individual, para:
+>>
+>> Caso a solicitação do estudante seja deferida:
+>>
+>> - defenir o notebook que será comprado, o seu preço e sua data de entrega prevista, utilizando:
+>>   - A informação sobre o curso do estudante para definir o modelo do notebook;
+>>   - A biblioteca 'selenium' para acessar o site da Dell, encontrar o modelo do notebook ,
+>>     coletar o preço do modelo, inserir o cep do estudante na página de 'Data de entrega estimada' e
+>>     coletar a data de entrega estimada para o cep inserido.
+>>           
+>> - Criar uma mensagem personalizada sobre as informações da solicitação com o nome,ra,notebook que será recebido,
+>>   e data de entrega estimada deste para ser enviada ao estudante. Utilizando a biblioteca 'email' inclusa no python.
+>>        
+>> - Enviar um e-mail para o e-mail do estudante fornecido a partir da conta 'projetonotebookcdia@gmail.com' com a mensagem
+>>   personalizada criada. Utilizando a biblioteca 'smtp' e 'ssl' inclusas no python.
+>>        
+>> Caso a solicitação do estudante não seja deferida:
+>>      
+>> - Criar uma mensagem personalizada sobre as informações da solicitação com o nome e ra
+>>   para ser enviada ao estudante. Utilizando a biblioteca 'email' inclusa no python.
+>>        
+>> - Enviar um e-mail para o e-mail do estudante fornecido a partir da conta 'projetonotebookcdia@gmail.com' com a mensagem
+>>   personalizada criada neste caso informando sobre o não deferimento. 
+>>   Utilizando a biblioteca 'smtp' e 'ssl' inclusas no python.
+>>        
+>>**Parâmetros de incialização de uma instância:**
+>>    
+>> - *navweb* = Navegador que será utilizado pela bilbioteca 'selenium' para realizar o WebScraping em forma de string
+>>    
+>> - *info_estudantes* = dicionário contendo informações do estudante cujo formato é:
+>>
+>>   - **'NOME'**: Nome do Estudante,
+>>   - **'RA'**: RA do Estudante,
+>>   - **'COD_CURSO'**: Código do Curso do Estudante,
+>>   - **'CEP'**: CEP do Estudante,
+>>   - **'EMAIL'**: Email do Estudante
+>>     
+>> - *deferido* = Valor booleano (True ou False) indicando se a solicitação do aluno foi deferida ou não.
 >
 ### Módulo ProcessoAutomatizado
 >
 >**Classes:**
 >>*ProcessarEstudante*
->
+>>
+>>Classe que tem como função agregar todos os processos realizados pelas classes do módulo Analista e do módulo Gerente e, a partir das informações de
+>>um estudante individual:
+>> - classificar sua solicitação como deferida ou não, 
+>> - encontrar o notebook que lhe será fornecido caso seja aprovado, seu preço e a data estimada de entrega para o cep do estudante,
+>> - criar uma mensagem de e-mail personalizada para o estudante contendo informações sobre sua solicitação,
+>> - enviar a mensagem criada para o estudante,
+>> - adiconar as informações da solicitação do estudante em um arquivo .csv que serve como histórico de solicitações.
+>>    
+>>**Parâmetros de Inicialização:**
+>> - *i_e* = dicionário contendo as informações necessárias do estudante para o processamento, que tem formato:
+>>     - **'nome'**: Nome do Estudante,
+>>     - **'ra'**: RA do Estudante,
+>>     - **'cod_curso'**: Código do Curso do Estudante,
+>>     - **'cep'**: CEP do Estudante,
+>>     - **'email'**: Email Estudante,
+>>     - **'renda'**: Renda familiar mensal do Estudante,
+>>     - **'escola'**: Código Referente a Escola do Estudante,
+>>     - **'motivação'**: Motivação do Estudante,
+>>     - **'cor'**: Código da cor do Estudante,
+>>     - **'sexo'**: Código do Sexo do Estudante
+>>   
+>> - *dir_arq_csv* = diretório local para salvar .csv referente ao histórico das solicitações.
+>>   
+>> - *filtkmeans* = Instância da classe ProjetoNotebook.Analista.FiltragemKMeans.
 >
