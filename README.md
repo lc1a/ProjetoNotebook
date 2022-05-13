@@ -31,7 +31,7 @@ Artificial, Turma CDIA-MA1. Projeto iniciado em Abril de 2022.**
 >
 >> *PlotarGraficos*
 >> - Utiliza os dados gerados pela classe ModificarDados para facilitar a visualização destes através da Criação de Gráficos utilizando a Biblioteca de Plotagem Matplotlib, armazena funções as quais cada uma realiza a criação de um ou mais gráficos diferente e os salva como um arquivo .jpg no diretório especificado na chamada da função. Aceita o mesmo parâmetro opcional da classe AgrupamentoCondicional Pois inicializa, através da classe ModificarDados, uma instância desta.
->> 
+>>
 >>   Gráficos Gerados:
 >> - Histograma da Renda da tabela armazenada na variável TABESTUDANTES (Tabela Original)
 >> - Gráfico de Dispersão da Renda em Escala Logaritmica com Linhas Horizontais Representando o Limite de Renda de cada Classe Social
@@ -42,7 +42,7 @@ Artificial, Turma CDIA-MA1. Projeto iniciado em Abril de 2022.**
 >> - tem como propósito Armazenar as funções que alteram os valores das cinco Colunas Primárias Pré-Determinadas,Para cada estudante, com o valor da NotaNormalizada (calculada a partir deste valor) das respectivas colunas.
 >> - Aceita mesmo parâmetro opcional da classe AgrupamentoCondicional para a Busca do Salário Mínimo Vigente Pois instancia uma classe desta.
 >> - Define o método Criar para cada Instância que retorna uma Tabela de Notas dos estudantes utilizando a tabela na variável COLUNASP (Tabela das colunas primárias pré-determinadas) e o Salário Mínimo Encontrado pela Instância da classe AgrupamentoCondicional.
->> 
+>>
 >>Critérios:
 >>
 >>Colunas Principais:
@@ -109,6 +109,14 @@ paralelamente.
 >>**Parâmetros de Inicialização:**
 >> - *pesos_por_vm* = Quantidade de Pesos que se deseja testar por chamada da API, que executa em uma única MV no ambiente do Google Cloud.
 >> - *limites* = Array de Condições das filtragens realizadas dos estudantes quando o peso que está sendo testado é usado como peso da Média Ponderada das Notas Normalizadas. Passado para a chamada da API em forma de parâmetro na URL.
->> 
->>  *Formato Array Limites* : (**NMaxAprovados**,**PctAprovadosPCurso**,**PctMinAMaisPretos**,**PctMinAmaisHomens**,**PctMinAMaisEPub**)
 >> - *n_vms* = Quantidade de chamadas simultâneas que se deseja realizar à API, sendo que cada uma será executada em uma MV diferente no ambiente do Google Cloud.
+
+### Módulo Gerente
+>
+>
+>
+
+### Módulo ProcessoAutomatizado
+>
+>
+>
