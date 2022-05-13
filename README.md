@@ -113,10 +113,16 @@ paralelamente.
 
 ### Módulo Gerente
 >
+>**Classes:**
+>>*HistoricoSolicitacoes*
+>>
 >
+>>*InformarEstudante*
+>>
 >
-
 ### Módulo ProcessoAutomatizado
 >
+>**Classes:**
+>>*ProcessarEstudante*
 >
 >
